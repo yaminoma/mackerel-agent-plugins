@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alouca/gosnmp"
+	g "github.com/soniah/gosnmp"
 	mp "github.com/mackerelio/go-mackerel-plugin-helper"
 )
 
 // SNMPMetrics metrics
 type SNMPMetrics struct {
-	OID     string
-	Metrics mp.Metrics
+	OIDS     []string
+	Metrics  mp.Metrics
 }
 
 // SNMPPlugin mackerel plugin for snmp
@@ -31,13 +31,16 @@ type SNMPPlugin struct {
 func (m SNMPPlugin) FetchMetrics() (map[string]interface{}, error) {
 	stat := make(map[string]interface{})
 
-	s, err := gosnmp.NewGoSNMP(m.Host, m.Community, gosnmp.Version2c, 30)
+	g.Default.Target = m.Host
+	g.Default.Community = m.Community
+	err := g.Default.Connect()
 	if err != nil {
-		return nil, err
+		log.Println(err)
 	}
+	defer g.Default.Conn.Close()
 
 	for _, sm := range m.SNMPMetricsSlice {
-		resp, err := s.Get(sm.OID)
+		resp, err := g.Default.Get(sm.OIDS)
 		if err != nil {
 			log.Println("SNMP get failed: ", err)
 			continue
@@ -103,7 +106,7 @@ func Do() {
 			mpm.Stacked, _ = strconv.ParseBool(vals[3])
 		}
 
-		sms = append(sms, SNMPMetrics{OID: vals[0], Metrics: mpm})
+		sms = append(sms, SNMPMetrics{OIDS: vals, Metrics: mpm})
 	}
 	snmp.SNMPMetricsSlice = sms
 
